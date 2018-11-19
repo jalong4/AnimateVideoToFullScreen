@@ -4,7 +4,6 @@ import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -14,19 +13,20 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
 
+    private RelativeLayout mRlVideoView;
     private TextureView mVideoView;
     private TextView mFpsHUD;
     private Button mToggleFullScreen;
@@ -51,12 +51,35 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         callDisplayModeAPI();
 
         mFpsHUD = (TextView) findViewById(R.id.tvFpsHUD);
         mToggleFullScreen = (Button) findViewById(R.id.btnToggleFullScreen);
         mProgress = (SeekBar) findViewById(R.id.sbSeekBar);
         mProgress.setProgress(0);
+
+        mProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    mMediaPlayer.pause();
+                    mMediaPlayer.seekTo(progress);
+                    mPosition = progress;
+                    mMediaPlayer.start();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+
+        mRlVideoView = (RelativeLayout) findViewById(R.id.rlVideoView);
         mVideoView = (TextureView) findViewById(R.id.tvVideoView);
 
         setupToggleFullScreenButton();
@@ -82,8 +105,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
         mObserver = new MediaObserver();
         new Thread(mObserver).start();
-        
-        setVideoViewToOriginalSize(false);
+
+        setVideoViewToOriginalSize();
         mVideoView.requestFocus();
         mVideoView.setSurfaceTextureListener(this);
 
@@ -106,7 +129,6 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     }
 
-
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
@@ -119,17 +141,17 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         super.onRestoreInstanceState(savedInstanceState);
         mPosition = savedInstanceState.getInt(POSITION_KEY);
         mMediaPlayer.seekTo(mPosition);
+        mMediaPlayer.start();
     }
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         mMediaPlayer.setSurface(new Surface(surface));
         mDuration = mMediaPlayer.getDuration();
-        mMediaPlayer.seekTo(mPosition);
-        mMediaPlayer.start();
         mProgress.setMax(mDuration);
         mProgress.setProgress(mPosition);
-
+        mMediaPlayer.seekTo(mPosition);
+        mMediaPlayer.start();
     }
 
     @Override
@@ -145,17 +167,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         double fps = fps();
-
         String fpsString = String.format("%.1f", fps);
-
         mFpsHUD.setText(fpsString);
-        Log.i(TAG, "fps=" + fpsString);
+        Double avg = totalFsp / fpsList.size();
+        Log.i(TAG, "fps=" + fpsString + ", avg fps=" + String.format("%.1f", avg));
     }
 
 
     private void resizeVideoView() {
-
-
         PropertyValuesHolder pvhLeft = PropertyValuesHolder.ofInt("left", 0, 1);
         PropertyValuesHolder pvhTop = PropertyValuesHolder.ofInt("top", 0, 1);
         PropertyValuesHolder pvhRight = PropertyValuesHolder.ofInt("right", 0, 1);
@@ -163,15 +182,15 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         PropertyValuesHolder pvhRoundness = PropertyValuesHolder.ofFloat("roundness", 0, 1);
 
 
-        final Animator collapseExpandAnim = ObjectAnimator.ofPropertyValuesHolder(mVideoView, pvhLeft, pvhTop,
+        final Animator collapseExpandAnim = ObjectAnimator.ofPropertyValuesHolder(mRlVideoView, pvhLeft, pvhTop,
                 pvhRight, pvhBottom, pvhRoundness);
-        collapseExpandAnim.setDuration(1000);
+        collapseExpandAnim.setDuration(800);
         collapseExpandAnim.setupStartValues();
 
-        mVideoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+        mRlVideoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {
-                mVideoView.getViewTreeObserver().removeOnPreDrawListener(this);
+                mRlVideoView.getViewTreeObserver().removeOnPreDrawListener(this);
                 collapseExpandAnim.setupEndValues();
                 collapseExpandAnim.start();
                 return false;
@@ -182,31 +201,23 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     private void setFullScreen() {
         DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) mVideoView.getLayoutParams();
+        android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) mRlVideoView.getLayoutParams();
         params.width =  metrics.widthPixels;
         params.height = metrics.heightPixels;
         params.setMargins(0, 0, 0, 0);
-        mVideoView.setLayoutParams(params);
+        mRlVideoView.setLayoutParams(params);
         resizeVideoView();
     }
 
     private void setVideoViewToOriginalSize() {
-        setVideoViewToOriginalSize(true);
-    }
-
-    private void setVideoViewToOriginalSize(Boolean animate) {
-
         DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mVideoView.getLayoutParams();
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mRlVideoView.getLayoutParams();
+        params.addRule(RelativeLayout.ALIGN_LEFT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
         params.width =  (int) (320 * metrics.density);
-        params.height = (int) (180 * metrics.density);
+        params.height = (int) (184 * metrics.density);
         params.setMargins(24, 24, 24, 24);
-
-        mVideoView.setLayoutParams(params);
-
-        if (animate) {
-            resizeVideoView();
-        }
+        mRlVideoView.setLayoutParams(params);
     }
 
     private void setToggleButtonText() {
@@ -216,6 +227,11 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     LinkedList<Long> times = new LinkedList<Long>(){{
         add(System.nanoTime());
     }};
+    LinkedList<Double> fpsList = new LinkedList<Double>(){{
+        add(0.0);
+    }};
+
+    Double totalFsp = 0.0;
 
     private final int MAX_SIZE = 100;
     private final double NANOS = 1000000000.0;
@@ -229,7 +245,16 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         if (size > MAX_SIZE) {
             times.removeFirst();
         }
-        return difference > 0 ? times.size() / difference : 0.0;
+        double result =  difference > 0 ? times.size() / difference : 0.0;
+
+        double fpsFirst = fpsList.getFirst();
+        totalFsp += result;
+        fpsList.addLast(new Double(result));
+        if (MAX_SIZE <= fpsList.size()) {
+            fpsList.removeFirst();
+            totalFsp -= fpsFirst;
+        }
+        return result;
     }
 
     public void callDisplayModeAPI() {
