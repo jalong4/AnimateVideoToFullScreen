@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.widget.RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <TextureView
+        android:id="@+id/tvVideoView"
+        android:layout_width="320dp"
+        android:layout_height="180dp"
+        android:layout_margin="@dimen/lb_action_icon_margin"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentBottom="true"/>
+
+    <SeekBar
+        android:id="@+id/sbSeekBar"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="4dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:id="@+id/tvFpsHUD"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@drawable/text_view_circle"
+        android:gravity="center"
+        android:padding="8dp"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#000"
+        android:text="0.0" />
+
+    <Button
+        android:id="@+id/btnToggleFullScreen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:text="Full Screen" />
+</android.widget.RelativeLayout>
