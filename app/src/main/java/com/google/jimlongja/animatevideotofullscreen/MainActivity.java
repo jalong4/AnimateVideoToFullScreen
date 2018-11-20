@@ -7,6 +7,7 @@ import android.app.Activity;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.PersistableBundle;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.Surface;
@@ -20,7 +21,10 @@ import android.util.Log;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+
+import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
@@ -29,9 +33,19 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private RelativeLayout mRlVideoView;
     private TextureView mVideoView;
     private TextView mFpsHUD;
+    private TextView mAvgFpsHUD;
+    private TextView mDroppedFramesHUD;
+    private TextView mCpuHUD;
+    private TextView mGpuHUD;
+    private TextView mMemHUD;
     private Button mToggleFullScreen;
     private int mPosition = 0;
     private int mDuration = 0;
+    private long mDurationPlayed = 0;
+    private long mFramesPlayed = 0;
+    private long mFramesDropped = 0;
+    private Double mTotalFsp = 0.0;
+
 
     private MediaPlayer mMediaPlayer;
 
@@ -39,6 +53,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private SeekBar mProgress;
     private android.widget.RelativeLayout.LayoutParams mOriginalParams;
     private Boolean mIsFullScreen = false;
+    private int mNumLoops = 0;
+
+    private LinkedList<Double> mFpsList = new LinkedList<Double>(Arrays.asList(0.0));
+
+    private static final int MAXLOOP = 10;
+    private static final int MAX_SIZE = 1000;
+    private static final double NANOS = 1000000000.0;
+    private static final double MILLIS = 1000.0;
     private static final String POSITION_KEY = "Position";
     private static final String TAG = "AnimateVideoToFullScreen";
 
@@ -55,6 +77,12 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         callDisplayModeAPI();
 
         mFpsHUD = (TextView) findViewById(R.id.tvFpsHUD);
+        mAvgFpsHUD = (TextView) findViewById(R.id.tvAvgFpsHUD);
+        mDroppedFramesHUD = (TextView) findViewById(R.id.tvDroppedFramesHUD);
+        mCpuHUD = (TextView) findViewById(R.id.tvCpuHUD);
+        mGpuHUD = (TextView) findViewById(R.id.tvGpuHUD);
+        mMemHUD = (TextView) findViewById(R.id.tvMemHUD);
+
         mToggleFullScreen = (Button) findViewById(R.id.btnToggleFullScreen);
         mProgress = (SeekBar) findViewById(R.id.sbSeekBar);
         mProgress.setProgress(0);
@@ -95,7 +123,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
-//                mObserver.stop();
+
+                mNumLoops ++;
+
+                if (mNumLoops >= MAXLOOP) {
+                    mObserver.stop();
+                    Log.i(TAG, "Video Test complete");
+                    return;
+                }
                 mMediaPlayer.seekTo(0);
                 mProgress.setProgress(0);
                 Log.i(TAG, "Looping Video");
@@ -166,11 +201,26 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        double fps = fps();
-        String fpsString = String.format("%.1f", fps);
-        mFpsHUD.setText(fpsString);
-        Double avg = totalFsp / fpsList.size();
-        Log.i(TAG, "fps=" + fpsString + ", avg fps=" + String.format("%.1f", avg));
+
+        getMediaPlayerMetrics();
+        double fps = (mDurationPlayed == 0) ? 0 : new Long(mFramesPlayed).doubleValue() / mDurationPlayed;
+
+        double fpsFirst = mFpsList.getFirst();
+        mTotalFsp += fps;
+        mFpsList.addLast(new Double(fps));
+        if (MAX_SIZE <= mFpsList.size()) {
+            mFpsList.removeFirst();
+            mTotalFsp -= fpsFirst;
+        }
+
+        double droppedPercentage = (mFramesPlayed == 0) ? 0 : (new Long(mFramesDropped).doubleValue() / mFramesPlayed) * 100.0;
+
+        Double avg = mTotalFsp / mFpsList.size();
+        mFpsHUD.setText(String.format("FPS\n%.1f", fps));
+        mAvgFpsHUD.setText(String.format("Avg\n%.1f", avg));
+        mDroppedFramesHUD.setText(String.format("Drop\n%.1f", droppedPercentage) + "%");
+
+        Log.i(TAG, "fps=" + String.format("%.1f", fps) + ", avg fps=" + String.format("%.1f", avg));
     }
 
 
@@ -224,40 +274,48 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         mToggleFullScreen.setText(mIsFullScreen ? "Exit full screen" : "Full sceeen");
     }
 
-    LinkedList<Long> times = new LinkedList<Long>(){{
-        add(System.nanoTime());
-    }};
-    LinkedList<Double> fpsList = new LinkedList<Double>(){{
-        add(0.0);
-    }};
+    private void getMediaPlayerMetrics() {
 
-    Double totalFsp = 0.0;
-
-    private final int MAX_SIZE = 100;
-    private final double NANOS = 1000000000.0;
-
-    /** Calculates and returns frames per second */
-    private double fps() {
-        long lastTime = System.nanoTime();
-        double difference = (lastTime - times.getFirst()) / NANOS;
-        times.addLast(lastTime);
-        int size = times.size();
-        if (size > MAX_SIZE) {
-            times.removeFirst();
+        // validate a few MediaMetrics.
+        PersistableBundle metrics = mMediaPlayer.getMetrics();
+        if (metrics == null) {
+            Log.d(TAG, "MediaPlayer.getMetrics() returned null metrics");
+            return;
         }
-        double result =  difference > 0 ? times.size() / difference : 0.0;
 
-        double fpsFirst = fpsList.getFirst();
-        totalFsp += result;
-        fpsList.addLast(new Double(result));
-        if (MAX_SIZE <= fpsList.size()) {
-            fpsList.removeFirst();
-            totalFsp -= fpsFirst;
+        if (metrics.isEmpty()) {
+            Log.d(TAG, "MediaPlayer.getMetrics() returned empty metrics");
+            return;
+
         }
-        return result;
+
+        int size = metrics.size();
+        Set<String> keys = metrics.keySet();
+
+        if (keys == null) {
+            Log.d(TAG, "MediaMetricsSet returned no keys");
+            return;
+        }
+
+        if (keys.size() != size) {
+            Log.d(TAG, "MediaMetricsSet.keys().size() mismatch MediaMetricsSet.size()");
+            return;
+        }
+
+
+        long frames = metrics.getLong(MediaPlayer.MetricsConstants.FRAMES, 0);
+        long framesDropped = metrics.getLong(MediaPlayer.MetricsConstants.FRAMES_DROPPED, 0);
+        int duration = mMediaPlayer.getCurrentPosition();
+
+        Log.d(TAG, "frames: " + Long.toString(frames) + " dropped: " + Long.toString(framesDropped) + " duration: " + Long.toString(duration));
+
+
+        mFramesPlayed = frames;
+        mFramesDropped = framesDropped;
+        mDurationPlayed = Math.round((mDuration / MILLIS) * mNumLoops) + Math.round(duration / MILLIS);
     }
 
-    public void callDisplayModeAPI() {
+    private void callDisplayModeAPI() {
         Display.Mode mode = getWindowManager().getDefaultDisplay().getMode();
         Log.i(TAG, "Display.Mode API: width=" + Integer.toString(mode.getPhysicalWidth()) + " height="
                 + Integer.toString(mode.getPhysicalHeight()) + " refresh Rate=" + Float

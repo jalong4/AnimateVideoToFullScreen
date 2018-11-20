@@ -31,17 +31,91 @@
 
     </RelativeLayout>
 
-    <TextView
-        android:id="@+id/tvFpsHUD"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:background="@drawable/text_view_circle"
-        android:gravity="center"
-        android:padding="8dp"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#000"
-        android:text="0.0" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+
+
+        <TextView
+            android:id="@+id/tvFpsHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:text="FPS\n50.2"
+            android:textStyle="bold"
+            android:textColor="#000" />
+
+        <TextView
+            android:id="@+id/tvAvgFpsHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#000"
+            android:text="Avg\n50.2" />
+
+        <TextView
+            android:id="@+id/tvDroppedFramesHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:text="Drop\n0.0%"
+            android:textStyle="bold"
+            android:textColor="#000" />
+
+        <TextView
+            android:id="@+id/tvCpuHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:text="CPU\n33.2%"
+            android:textStyle="bold"
+            android:textColor="#000" />
+
+        <TextView
+            android:id="@+id/tvGpuHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:text="GPU\n33.2%"
+            android:textStyle="bold"
+            android:textColor="#000" />
+
+        <TextView
+            android:id="@+id/tvMemHUD"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/text_view_circle"
+            android:gravity="center"
+            android:layout_marginRight="8dp"
+            android:textSize="24sp"
+            android:text="Mem\n64.2%"
+            android:textStyle="bold"
+            android:textColor="#000" />
+
+    </LinearLayout>
+
 
     <Button
         android:id="@+id/btnToggleFullScreen"
