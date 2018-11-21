@@ -3,6 +3,7 @@ package com.google.jimlongja.animatevideotofullscreen;
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
@@ -13,6 +14,7 @@ import android.view.Display;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -29,8 +31,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
-
-    private RelativeLayout mRlVideoView;
     private TextureView mVideoView;
     private TextView mFpsHUD;
     private TextView mAvgFpsHUD;
@@ -107,7 +107,6 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
             }
         });
 
-        mRlVideoView = (RelativeLayout) findViewById(R.id.rlVideoView);
         mVideoView = (TextureView) findViewById(R.id.tvVideoView);
 
         setupToggleFullScreenButton();
@@ -141,7 +140,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         mObserver = new MediaObserver();
         new Thread(mObserver).start();
 
-        setVideoViewToOriginalSize();
+        setVideoViewToOriginalSize(false);
         mVideoView.requestFocus();
         mVideoView.setSurfaceTextureListener(this);
 
@@ -232,18 +231,41 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         PropertyValuesHolder pvhRoundness = PropertyValuesHolder.ofFloat("roundness", 0, 1);
 
 
-        final Animator collapseExpandAnim = ObjectAnimator.ofPropertyValuesHolder(mRlVideoView, pvhLeft, pvhTop,
+
+        final Animator collapseExpandAnim = ObjectAnimator.ofPropertyValuesHolder(mVideoView, pvhLeft, pvhTop,
                 pvhRight, pvhBottom, pvhRoundness);
         collapseExpandAnim.setDuration(800);
         collapseExpandAnim.setupStartValues();
 
-        mRlVideoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+        mVideoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {
-                mRlVideoView.getViewTreeObserver().removeOnPreDrawListener(this);
+                mVideoView.getViewTreeObserver().removeOnPreDrawListener(this);
                 collapseExpandAnim.setupEndValues();
                 collapseExpandAnim.start();
                 return false;
+            }
+        });
+
+        collapseExpandAnim.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mProgress.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                mProgress.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
             }
         });
 
@@ -251,23 +273,61 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     private void setFullScreen() {
         DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) mRlVideoView.getLayoutParams();
+        android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) mVideoView.getLayoutParams();
         params.width =  metrics.widthPixels;
         params.height = metrics.heightPixels;
         params.setMargins(0, 0, 0, 0);
-        mRlVideoView.setLayoutParams(params);
+        mVideoView.setLayoutParams(params);
+        mProgress.setVisibility(View.INVISIBLE);
+        setProgressBarToFullScreen();
         resizeVideoView();
     }
 
     private void setVideoViewToOriginalSize() {
+        setVideoViewToOriginalSize(true);
+    }
+
+    private void setVideoViewToOriginalSize(boolean animate) {
         DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mRlVideoView.getLayoutParams();
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mVideoView.getLayoutParams();
         params.addRule(RelativeLayout.ALIGN_LEFT);
         params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        params.width =  (int) (320 * metrics.density);
-        params.height = (int) (184 * metrics.density);
+        params.width =  metrics.widthPixels / 5;
+        params.height = metrics.heightPixels / 5;
         params.setMargins(24, 24, 24, 24);
-        mRlVideoView.setLayoutParams(params);
+
+        mVideoView.setLayoutParams(params);
+        setProgressBarToOriginalSize(animate);
+
+        if (animate) {
+            resizeVideoView();
+        }
+    }
+
+    private void setProgressBarToOriginalSize(boolean animate) {
+        DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mProgress.getLayoutParams();
+        params.addRule(RelativeLayout.ALIGN_LEFT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        params.width =  (metrics.widthPixels / 5) + 48;
+
+
+        if (animate) {
+            mProgress.setVisibility(View.INVISIBLE);
+        }
+        mProgress.setLayoutParams(params);
+
+    }
+
+    private void setProgressBarToFullScreen() {
+        DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mProgress.getLayoutParams();
+        params.addRule(RelativeLayout.ALIGN_LEFT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        params.width =  metrics.widthPixels;
+        params.setMargins(0, 0, 0, 0);
+        mProgress.setLayoutParams(params);
+
     }
 
     private void setToggleButtonText() {
